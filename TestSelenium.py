@@ -23,10 +23,12 @@ def AuthorizationForHasfesshen(driver):
 
     Auth_Imp = driver.find_element(By.NAME, "Login")
     Auth_Imp.click()
-    time.sleep(5)
+    
+    time.sleep(10) 
+    
 #Получение страниц каталога
 def GettingСategories(driver):
-    time.sleep(5)
+   
     # Обращение к эксель файлу
     file_name = "HassCatalog.xlsx"
     file_path = "G:\\NRU\\SP\\Parsing\\TestSelenium\\TestSelenium\\HassCatalog.xlsx" 
@@ -35,27 +37,23 @@ def GettingСategories(driver):
     ws = wb.active 
     LinkPages = []
     
+
     for index, row in enumerate(range(2, ws.max_row + 1)):
          current_collection = ws[row][0].value 
          if index > 0:
             last_collection = ws[row - 1][0].value  
-            if last_collection !=  current_collection:              
-                ParsingPage(driver, LinkPages, current_collection)
+            if last_collection !=  current_collection:
+                print(f'Start parsing page for next colltction: {last_collection}'  )
+                Goods = ParsingPage(driver, LinkPages) 
+                RecordingInExcel(driver,Goods,last_collection)
                 LinkPages = []              
-    LinkPages.append(ws[row][2].value)  
+         LinkPages.append(ws[row][2].value) 
+         
+    Goods = ParsingPage(driver, LinkPages) 
+    RecordingInExcel(driver,Goods,last_collection)
     
-    # for row in range(2, ws.max_row+1):
-    #     # CategorryName = ws[row][1].value 
-    #     Collectcia = ws[row][0].value 
-    #     while ws[row][0].value == ws[row-1][0].value:
-    #         LinkPages.append(ws[row+1][2].value)
-    #         ParsingPage(driver, LinkPages, Collectcia)
-    #         continue   
-    # LinkPages.append(ws[row][2].value)
-    # ParsingPage(driver, LinkPages, Collectcia)
-      
 #Парсинг страницы
-def ParsingPage(driver, LinkPages,CategoryName):    
+def ParsingPage(driver, LinkPages):    
   for LinkPage in LinkPages:   
       driver.get(LinkPage) 
       time.sleep(10)
@@ -121,9 +119,10 @@ def ParsingPage(driver, LinkPages,CategoryName):
         # Запись структуры в список   
         Goods.append(StructureOfProduct)
       print(Goods)
+      return Goods
       RecordingInExcel(driver,Goods,CategoryName)
     
-    # Работа с екселем
+#Запись в эксель      
 def RecordingInExcel(driver,Goods,CategoryName): 
     # Создание\загрузка эксель файла
     file_name = "hasf-parser1.xlsx"
@@ -143,11 +142,18 @@ def RecordingInExcel(driver,Goods,CategoryName):
         print(f"Создан новый лист '{CategoryName}'.")
        
     # Добавление данных
-    if ws[1][1] == None:    
         headers = ['Название', 'Артикл', 'Бренд', 'Цена', 'Размер', 'Описание', 'Изображение', 'Изображение1', 'Изображение2', 'Изображение3', 'Ссылка на товар']
-        ws.append(headers) 
-   
-    for index, item in enumerate(Goods, start=2):  
+        ws.append(headers)
+    
+    # Определение активную строки заполнения    
+    start_row = ws.max_row + 1  
+    # for row_idx in range(1, ws.max_row + 1):
+    #      row_values = [cell.value for cell in ws[row_idx]]
+    #      if not any(row_values):  
+    #           start_row = row_idx
+    #           break
+            
+    for index, item in enumerate(Goods, start=start_row):  
         ws.cell(row=index, column=1, value=item[0])  
         ws.cell(row=index, column=2, value=item[1])
         ws.cell(row=index, column=3, value=item[2])
@@ -158,14 +164,15 @@ def RecordingInExcel(driver,Goods,CategoryName):
             if img_index < 4:
                 ws.cell(row=index, column=7 + img_index, value=img) 
         ws.cell(row=index, column=11, value=item[7])
+       
     wb.save(file_path)
     print(f"Данные по категории {CategoryName} успешно записаны в файл '{file_name}'.") 
     
     try:  
         FL = wb["Sheet"]
         FL.title = "Лист1"
-        # wb.remove(FL)
-        wb.move_sheet(wb["Лист1"], offset = len(wb.sheetnames) - 1)
+        wb.remove(wb["Лист1"])
+        # wb.move_sheet(wb["Лист1"], offset = len(wb.sheetnames) - 1)
         wb.save(file_path)   
     except:
         pass
@@ -175,7 +182,6 @@ s=Service('G:\\NRU\\SP\\Parsing\\selenium\\chromedriver\\win64\\130.0.6723.69\\c
 driver = webdriver.Chrome(service=s)
 AuthorizationForHasfesshen(driver)
 GettingСategories(driver)
-# ParsingPage(driver)
 
 input()
 
