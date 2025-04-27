@@ -3,13 +3,16 @@
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
+# from selenium.webdriver.common.keys import Keys
+import threading
+import queue
 import time
 
 import openpyxl
 from openpyxl import Workbook,load_workbook
 import xlsxwriter
 import os
+
 
 # Авторизация на ХассФэсшен 
 def AuthorizationForHasfesshen(driver):
@@ -24,7 +27,7 @@ def AuthorizationForHasfesshen(driver):
     Auth_Imp = driver.find_element(By.NAME, "Login")
     Auth_Imp.click()
     
-    time.sleep(10) 
+    time.sleep(2) 
         
 #Получение страниц каталога из Экселя
 def GettingСategories(driver):
@@ -34,20 +37,38 @@ def GettingСategories(driver):
     ws = wb.active 
     LinkPages = []
     for index, row in enumerate(range(2, ws.max_row + 1)):
-        print(row, index) 
         current_collection = ws[row][0].value 
         if index > 0:
             last_collection = ws[row - 1][0].value  
             if last_collection !=  current_collection and last_collection !=  None :
                     print(f'Start parsing page for next colltction: {last_collection}')
-                    Goods = ParsingPage(driver, LinkPages) 
-                    RecordingInExcel(driver,Goods,last_collection)
+                    
+                    # Goods = ParsingPage(driver, LinkPages) 
+                    Goods_queue = queue.Queue()
+                    trd1 = threading.Thread(target=ParsingPage, args=(driver,LinkPages,Goods_queue))
+                    trd1.start()
+                    trd1.join() 
+                    Goods = Goods_queue.get()
+
+                    # RecordingInExcel(driver,Goods,last_collection)
+                    trd3 = threading.Timer(1,RecordingInExcel(driver, Goods, last_collection))
+                    trd3.start()
+                    trd3.join() 
+
                     LinkPages = []              
         LinkPages.append(ws[row][2].value) 
     lastest_collection = ws[ws.max_row][0].value
     print(f'Start parsing page for next colltction: {lastest_collection}')
-    Goods = ParsingPage(driver, LinkPages) 
-    RecordingInExcel(driver,Goods,lastest_collection)   
+    # Goods = ParsingPage(driver, LinkPages) 
+    Goods_queue = queue.Queue()
+    trd1 = threading.Thread(target=ParsingPage, args=(driver,LinkPages,Goods_queue))
+    trd1.start()
+    trd1.join() 
+    Goods = Goods_queue.get()
+    # RecordingInExcel(driver,Goods,lastest_collection)
+    trd3 = threading.Timer(1, RecordingInExcel(driver, Goods, last_collection))
+    trd3.start()
+    trd3.join() 
     
 class TabInd:
             NAME = 0
@@ -60,7 +81,7 @@ class TabInd:
             LINK = 7
     
 #Парсинг страницы
-def ParsingPage(driver, LinkPages): 
+def ParsingPage(driver, LinkPages,Goods_queue): 
   Goods = [] 
   Video = []
   print(LinkPages)
@@ -126,11 +147,12 @@ def ParsingPage(driver, LinkPages):
             }
         # Запись структуры в список   
         Goods.append(StructureOfProduct)
-  return Goods 
+  # return Goods
+  Goods_queue.put(Goods)
   return Video
    
 #Запись в эксель      
-def RecordingInExcel(driver,Goods,CategoryName): 
+def RecordingInExcel(driver,Goods,CollectionName): 
     # Создание\загрузка эксель файла
     file_name = "hasf-parser2.xlsx"
     file_path = "G:\\NRU\\SP\\Parsing\\TestSelenium\\TestSelenium\\hasf-parser2.xlsx" 
@@ -141,18 +163,18 @@ def RecordingInExcel(driver,Goods,CategoryName):
          wb = Workbook()  
          print(f"Файл '{file_name}' успешно создан.")     
     # Обращение к книге и листам  
-    if CategoryName in wb.sheetnames:
+    if CollectionName in wb.sheetnames:
         #Обращение к листу и удаление не актуальных данных  
-        ws = wb[CategoryName] 
-        print(f"Лист '{CategoryName}' уже существует. Данные будут обновлены.")
+        ws = wb[CollectionName] 
+        print(f"Лист '{CollectionName}' уже существует. Данные будут обновлены.")
         if ws.cell(row=2, column=1).value is not None:
            for row in ws.iter_rows():
                for cell in row: 
                    cell.value = None   
     else:
         #Создание листа 
-        ws = wb.create_sheet(title=CategoryName)
-        print(f"Создан новый лист '{CategoryName}'.")
+        ws = wb.create_sheet(title=CollectionName)
+        print(f"Создан новый лист '{CollectionName}'.")
     
     # Добавление данных
     headers = ['Название', 'Артикл', 'Бренд', 'Цена', 'Размер', 'Описание', 'Изображение', 'Изображение1', 'Изображение2', 'Изображение3', 'Ссылка на товар']  
@@ -171,7 +193,7 @@ def RecordingInExcel(driver,Goods,CategoryName):
                 ws.cell(row=index, column=7 + imgindex, value = img) 
         ws.cell(row=index, column=11, value=item[7])
     wb.save(file_path)
-    print(f"Данные по категории {CategoryName} успешно записаны в файл '{file_name}'.") 
+    print(f"Данные по категории {CollectionName} успешно записаны в файл '{file_name}'.") 
     
     try:  
         wb["Sheet"].title = "Лист1"
@@ -182,8 +204,18 @@ def RecordingInExcel(driver,Goods,CategoryName):
 #Главная процедура   
 s=Service('G:\\NRU\\SP\\Parsing\\selenium\\chromedriver\\win64\\134.0.6998.88\\chromedriver-win64\\chromedriver.exe')
 driver = webdriver.Chrome(service=s)
-AuthorizationForHasfesshen(driver)
-GettingСategories(driver)
+# AuthorizationForHasfesshen(driver)
+# GettingСategories(driver)
+
+trd1 = threading.Thread(target=AuthorizationForHasfesshen(driver))
+trd1.start()
+trd1.join()
+trd2 = threading.Timer(2, GettingСategories(driver))
+trd2.start()
+trd2.join()
+
+
+
 input()
 
     
