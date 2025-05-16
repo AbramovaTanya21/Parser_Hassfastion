@@ -31,10 +31,10 @@ def AuthorizationForHasfesshen(driver):
     time.sleep(2) 
           
 #Получение страниц каталога из Экселя
-def GettingСategories(driver):
+def GettingСategories():
     #Создание экземпляра драйвера
-    # s=Service('G:\\NRU\\SP\\Parsing\\selenium\\chromedriver\\win64\\136.0.7103.92\\chromedriver.exe')
-    # driver = webdriver.Chrome(service=s)
+    s=Service('G:\\NRU\\SP\\Parsing\\selenium\\chromedriver\\win64\\136.0.7103.92\\chromedriver.exe')
+    driver = webdriver.Chrome(service=s)
     
     # Обращение к эксель файлу
     file_path = "G:\\NRU\\SP\\Parsing\\TestSelenium\\TestSelenium\\HassCatalog.xlsx"  
@@ -95,7 +95,9 @@ class TabInd:
             LINK = 7  
 #Парсинг страницы
 def ParsingPage(Links,CollectionName):
-
+   
+   d=Service('G:\\NRU\\SP\\Parsing\\selenium\\chromedriver\\win64\\136.0.7103.92\\chromedriver.exe')
+   driver = webdriver.Chrome(service=d) 
    Goods = []
    Video = []
   #Создание экземпляра драйвера
@@ -137,11 +139,14 @@ def ParsingPage(Links,CollectionName):
         Picture = []
         Pictures = driver.find_elements(By.XPATH,"//div[@class ='miniatures_item df fdc']//img")
         Video.append(Pictures[0].get_attribute("src"))
-        for index, Pict in enumerate(Pictures):
-            if len(Pictures) > 5 and index > 0:           
+        if len(Pictures) > 5:
+            for index, Pict in enumerate(Pictures):
+                if index > 0:           
                     if index % 2 != 0:
                          Picture.append(Pict.get_attribute("src"))
-            elif index > 0:                  
+        else: 
+             for index, Pict in enumerate(Pictures):
+                if index > 0:    
                     Picture.append(Pict.get_attribute("src"))    
         # Запись данных в экземляр структуры StructureOfProducts    
         StructureOfProduct = {
@@ -215,9 +220,7 @@ def RecordingInExcel(Goods,CollectionName):
 
     
 #Главная процедура  
-s=Service('G:\\NRU\\SP\\Parsing\\selenium\\chromedriver\\win64\\136.0.7103.92\\chromedriver.exe')
-driver = webdriver.Chrome(service=s) 
-GettingСategories(driver)
+GettingСategories()
 # GoodsLinksQueue = queue.Queue()
 
 # LinksLoaded = threading.Condition()
