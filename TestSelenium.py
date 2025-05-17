@@ -31,7 +31,7 @@ def AuthorizationForHasfesshen(driver):
     time.sleep(2) 
           
 #Получение страниц каталога из Экселя
-def GettingСategories():
+def GettingLinks(LinksLoaded):
     #Создание экземпляра драйвера
     s=Service('G:\\NRU\\SP\\Parsing\\selenium\\chromedriver\\win64\\136.0.7103.92\\chromedriver.exe')
     driver = webdriver.Chrome(service=s)
@@ -60,9 +60,10 @@ def GettingСategories():
                            a = OnSale.find_element(By.TAG_NAME, "a")
                            Links.append(a.get_attribute("href"))   
                     
-                    time.sleep(10)
-                    # LinksLoaded.notify()
-                    ParsingPage(Links,last_collection)                
+                    time.sleep(10)                
+                    GoodsLinksQueue.put((last_collection, Links))
+                    LinksLoaded.notify()
+                    # ParsingGoods(Links,last_collection)                
                     LinkPages = [] 
                     
         LinkPages.append(ws[row][2].value) 
@@ -81,8 +82,10 @@ def GettingСategories():
          Links.append(a.get_attribute("href"))   
                     
     time.sleep(10) 
-    # LinksLoaded.notify()
-    ParsingPage(Links,lastest_collection) 
+    LinksLoaded.notify()
+    # ParsingGoods(Links,lastest_collection)
+    GoodsLinksQueue.put((last_collection, Links))
+    LinksLoaded.notify() 
     
 class TabInd:
             NAME = 0
@@ -94,21 +97,21 @@ class TabInd:
             PHOTO = 6
             LINK = 7  
 #Парсинг страницы
-def ParsingPage(Links,CollectionName):
+def ParsingGoods(LinksLoaded,Lock):
    
-   d=Service('G:\\NRU\\SP\\Parsing\\selenium\\chromedriver\\win64\\136.0.7103.92\\chromedriver.exe')
-   driver = webdriver.Chrome(service=d) 
-   Goods = []
-   Video = []
-  #Создание экземпляра драйвера
-    # d=Service('G:\\NRU\\SP\\Parsing\\selenium\\chromedriver\\win64\\136.0.7103.92\\chromedriver.exe')
-    # driver = webdriver.Chrome(service=d)
-
-    # Collectioname = CollectionName
-    #Вызов авторизации  
-   AuthorizationForHasfesshen(driver)   
+  with LinksLoaded:
+        LinksLoaded.wait()
+  while not GoodsLinksQueue.empty():
+     Links,CollectionName = GoodsLinksQueue.get()
+  #Создание экземпляра драйвера      
+  d=Service('G:\\NRU\\SP\\Parsing\\selenium\\chromedriver\\win64\\136.0.7103.92\\chromedriver.exe')
+  driver = webdriver.Chrome(service=d) 
+  Goods = []
+  Video = []
+  #Вызов авторизации  
+  AuthorizationForHasfesshen(driver)   
 # Сбор данных со страницы товара в структуры и запись в список 
-   for Link in Links:
+  for Link in Links:
         driver.get(Link)         
         #Имя
         Name1 = driver.find_element(By.XPATH,"//div[@class ='title h3 mobile']").get_attribute("innerText")
@@ -161,9 +164,12 @@ def ParsingPage(Links,CollectionName):
             }
         # Запись структуры в список   
         Goods.append(StructureOfProduct)
+  with Lock:
+        print(f'Сбор данных по коллекции {CollectionName} завершен')
+
   # Передаем Goods
-   RecordingInExcel(Goods, CollectionName)
-    
+  RecordingInExcel(Goods, CollectionName)
+
 #Запись в эксель      
 def RecordingInExcel(Goods,CollectionName): 
     # Создание\загрузка эксель файла
@@ -220,29 +226,22 @@ def RecordingInExcel(Goods,CollectionName):
 
     
 #Главная процедура  
-GettingСategories()
-# GoodsLinksQueue = queue.Queue()
 
-# LinksLoaded = threading.Condition()
-# links_parser = threading.Thread(target = GettingСategories(), args = (LinksLoaded,))
-# links_parser.start()
+GoodsLinksQueue = queue.Queue()
+LinksLoaded = threading.Condition()
+Lock = threading.Lock()
 
+linksParser = threading.Thread(target = GettingLinks(), args = (LinksLoaded))
+linksParser.start()
 
+GoodsParser = threading.Thread(target = ParsingGoods(), args = (LinksLoaded,Lock))
+GoodsParser.start()
 
-# book_locker = threading.Lock()
+linksParser.join()
+GoodsParser.join()
 
-# for i in range(WORKERS_COUNT):
-#      goods_parser = threading.Thread(name = str(i), target = parse_goods, args = (links_loaded, book_locker))
-#      goods_parser.start()
-
-# for thread in threading.enumerate():
-#      if thread != threading.main_thread():
-#          thread.join()
-
-# g_book.close()
-# print("Готово")
-# a = input()
-    
+GoodsLinksQueue.close()
+ 
 print("Готово")
 input()
 
