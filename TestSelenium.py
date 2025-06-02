@@ -225,7 +225,7 @@ GoodsLinksQueue = queue.Queue()
 LinksLoaded = threading.Condition()
 
 linksParser = threading.Thread(target = GettingLinks, args = (LinksLoaded,))
-LinksLoaded.start()
+linksParser.start()
 
 ##Создание экземпляра драйвера  
 d=Service('G:\\NRU\\SP\\Parsing\\selenium\\chromedriver\\win64\\136.0.7103.92\\chromedriver.exe')
