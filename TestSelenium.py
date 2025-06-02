@@ -17,8 +17,7 @@ import os
  # Авторизация на ХассФэсшен 
 def AuthorizationForHasfesshen(driver):
     driver.get("https://hassfashion.ru/auth/?login=yes")
-    time.sleep(5)
-
+    
     Auht_Log = driver.find_element(By.NAME, "USER_LOGIN")
     Auht_Log.send_keys('Olga_Guschina@mail.ru')
 
@@ -28,7 +27,7 @@ def AuthorizationForHasfesshen(driver):
     Auth_Imp = driver.find_element(By.NAME, "Login")
     Auth_Imp.click()
     
-    time.sleep(2) 
+    time.sleep(10) 
           
 #Получение страниц каталога из Экселя
 def GettingLinks(LinksLoaded):
@@ -46,24 +45,24 @@ def GettingLinks(LinksLoaded):
         if index > 0:
             last_collection = ws[row - 1][0].value  
             if last_collection !=  current_collection and last_collection !=  None :
-                    print(f'Начат сбор данных для следующей коллекции: {last_collection}')
-                    Goods = [] 
-                    Video = []
+                    print(f'GettingLinks: Начат сбор ссылок для коллекции {last_collection}')
                     for LinkPage in LinkPages:   
                          driver.get(LinkPage) 
                          print(LinkPage)
                          time.sleep(5)  
-                    # Отбор товаров в наличие
-                    Links = [] 
-                    OnSales = driver.find_elements(By.XPATH, "//div[@class='res_cards']/div[not(@style)]") 
-                    for OnSale in OnSales:   
+                         # Отбор товаров в наличие
+                         Links = [] 
+                         OnSales = driver.find_elements(By.XPATH, "//div[@class='res_cards']/div[not(@style)]") 
+                         for OnSale in OnSales:   
                            a = OnSale.find_element(By.TAG_NAME, "a")
                            Links.append(a.get_attribute("href"))   
-                    
-                    time.sleep(10)                
-                    GoodsLinksQueue.put((last_collection, Links))
-                    LinksLoaded.notify()
-                    # ParsingGoods(Links,last_collection)                
+                         print(f'GettingLinks: Закончен сбор ссылок для коллекции {last_collection}')
+
+                         time.sleep(10)                
+                         GoodsLinksQueue.put((last_collection, Links))
+                         with LinksLoaded:
+                            LinksLoaded.notify()
+                           
                     LinkPages = [] 
                     
         LinkPages.append(ws[row][2].value) 
@@ -80,12 +79,9 @@ def GettingLinks(LinksLoaded):
     for OnSale in OnSales:   
          a = OnSale.find_element(By.TAG_NAME, "a")
          Links.append(a.get_attribute("href"))   
-                    
-    time.sleep(10) 
-    LinksLoaded.notify()
-    # ParsingGoods(Links,lastest_collection)
+                
     GoodsLinksQueue.put((last_collection, Links))
-    LinksLoaded.notify() 
+    
     
 class TabInd:
             NAME = 0
@@ -96,22 +92,21 @@ class TabInd:
             DESCRIPTION = 5
             PHOTO = 6
             LINK = 7  
-#Парсинг страницы
-def ParsingGoods(LinksLoaded,Lock):
-   
-  with LinksLoaded:
-        LinksLoaded.wait()
-  while not GoodsLinksQueue.empty():
-     Links,CollectionName = GoodsLinksQueue.get()
-  #Создание экземпляра драйвера      
-  d=Service('G:\\NRU\\SP\\Parsing\\selenium\\chromedriver\\win64\\136.0.7103.92\\chromedriver.exe')
-  driver = webdriver.Chrome(service=d) 
+#Парсинг страницы товара
+def ParsingGoods(LinksLoaded, driver):
+  
   Goods = []
   Video = []
-  #Вызов авторизации  
-  AuthorizationForHasfesshen(driver)   
-# Сбор данных со страницы товара в структуры и запись в список 
-  for Link in Links:
+  
+  with LinksLoaded:
+        LinksLoaded.wait()
+
+  while not GoodsLinksQueue.empty():  
+     CollectionName, Links = GoodsLinksQueue.get()
+     print(f'ParsingGoods: Начат сбор данных по коллекции {CollectionName}')  
+     # Сбор данных со страницы товара в структуры и запись в список 
+     
+     for Link in Links:
         driver.get(Link)         
         #Имя
         Name1 = driver.find_element(By.XPATH,"//div[@class ='title h3 mobile']").get_attribute("innerText")
@@ -164,25 +159,24 @@ def ParsingGoods(LinksLoaded,Lock):
             }
         # Запись структуры в список   
         Goods.append(StructureOfProduct)
-  with Lock:
-        print(f'Сбор данных по коллекции {CollectionName} завершен')
-
-  # Передаем Goods
-  RecordingInExcel(Goods, CollectionName)
-
+     # Передаем Goods 
+     print(f'ParsingGoods: Сбор данных по коллекции {CollectionName} завершен')
+     RecordingToExcel(Goods, CollectionName)
+    
+        
 #Запись в эксель      
-def RecordingInExcel(Goods,CollectionName): 
+def RecordingToExcel(Goods,CollectionName): 
     # Создание\загрузка эксель файла
     file_name = "hasf-parser2.xlsx"
     file_path = "G:\\NRU\\SP\\Parsing\\TestSelenium\\TestSelenium\\hasf-parser2.xlsx" 
     if os.path.exists(file_name):
         wb = load_workbook(file_path)
-        print(f"Файл '{file_name}' успешно загружен.")
+        print(f"RecordingInExcel: Файл '{file_name}' успешно загружен.")
         # Обращение к книге и листам  
         if CollectionName in wb.sheetnames:
             #Обращение к листу и удаление не актуальных данных  
             ws = wb[CollectionName] 
-            print(f"Лист '{CollectionName}' уже существует. Данные будут обновлены.")
+            print(f"RecordingInExcel: Лист '{CollectionName}' уже существует. Данные будут обновлены.")
             if ws.cell(row=2, column=1).value is not None:
                 for row in ws.iter_rows():
                     for cell in row: 
@@ -193,9 +187,9 @@ def RecordingInExcel(Goods,CollectionName):
             print(f"Создан новый лист '{CollectionName}'.")
     else:
        wb = Workbook()  
-       print(f"Файл '{file_name}' успешно создан.")     
+       print(f"RecordingInExcel:Файл '{file_name}' успешно создан.")     
        ws = wb.create_sheet(title=CollectionName)
-       print(f"Создан новый лист '{CollectionName}'.")
+       print(f"RecordingInExcel:Создан новый лист '{CollectionName}'.")
    
     
     # Добавление данных
@@ -215,7 +209,7 @@ def RecordingInExcel(Goods,CollectionName):
                 ws.cell(row=index, column=7 + imgindex, value = img) 
         ws.cell(row=index, column=11, value=item[7])
     wb.save(file_path)
-    print(f"Данные по категории {CollectionName} успешно записаны в файл '{file_name}'.") 
+    print(f"RecordingInExcel: Данные по категории {CollectionName} успешно записаны в файл '{file_name}'.") 
     
     try:  
         wb["Sheet"].title = "Лист1"
@@ -225,26 +219,32 @@ def RecordingInExcel(Goods,CollectionName):
     
 
     
-#Главная процедура  
+#Главная процедура 
 
 GoodsLinksQueue = queue.Queue()
 LinksLoaded = threading.Condition()
-Lock = threading.Lock()
 
-linksParser = threading.Thread(target = GettingLinks(), args = (LinksLoaded))
-linksParser.start()
+linksParser = threading.Thread(target = GettingLinks, args = (LinksLoaded,))
+LinksLoaded.start()
 
-GoodsParser = threading.Thread(target = ParsingGoods(), args = (LinksLoaded,Lock))
+##Создание экземпляра драйвера  
+d=Service('G:\\NRU\\SP\\Parsing\\selenium\\chromedriver\\win64\\136.0.7103.92\\chromedriver.exe')
+driver = webdriver.Chrome(service=d)
+#Вызов авторизации  
+AuthorizationForHasfesshen(driver) 
+
+GoodsParser = threading.Thread(target = ParsingGoods, args = (LinksLoaded,driver))
 GoodsParser.start()
 
 linksParser.join()
 GoodsParser.join()
 
-GoodsLinksQueue.close()
- 
 print("Готово")
 input()
 
 
 
+
+
     
+
