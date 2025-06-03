@@ -28,7 +28,18 @@ def AuthorizationForHasfesshen(driver):
     Auth_Imp.click()
     
     time.sleep(10) 
-          
+   
+def ScrollPage(driver):
+    num_scrolls = 5
+    def scroll_down():
+            print("scroll_down:")
+            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            time.sleep(2)  
+            
+    # Делаем прокрутки
+    for i in range(num_scrolls):
+            scroll_down()
+   
 #Получение страниц каталога из Экселя
 def GettingLinks(LinksLoaded):
     #Создание экземпляра драйвера
@@ -39,50 +50,53 @@ def GettingLinks(LinksLoaded):
     file_path = "G:\\NRU\\SP\\Parsing\\TestSelenium\\TestSelenium\\HassCatalog.xlsx"  
     wb = load_workbook(file_path)
     ws = wb.active 
-    LinkPages = []
-    for index, row in enumerate(range(2, ws.max_row + 1)):
-        current_collection = ws[row][0].value 
-        if index > 0:
-            last_collection = ws[row - 1][0].value  
-            if last_collection !=  current_collection and last_collection !=  None :
-                    print(f'GettingLinks: Начат сбор ссылок для коллекции {last_collection}')
-                    for LinkPage in LinkPages:   
-                         driver.get(LinkPage) 
-                         print(LinkPage)
-                         time.sleep(5)  
-                         # Отбор товаров в наличие
-                         Links = [] 
-                         OnSales = driver.find_elements(By.XPATH, "//div[@class='res_cards']/div[not(@style)]") 
-                         for OnSale in OnSales:   
-                           a = OnSale.find_element(By.TAG_NAME, "a")
-                           Links.append(a.get_attribute("href"))   
-                         print(f'GettingLinks: Закончен сбор ссылок для коллекции {last_collection}')
-
-                         time.sleep(10)                
-                         GoodsLinksQueue.put((last_collection, Links))
-                         with LinksLoaded:
-                            LinksLoaded.notify()
-                           
-                    LinkPages = [] 
-                    
+    LinkPages = [] 
+    LinksNotLoaded = True
+    last_collection = ws[2][0].value  
+    for row in range(2, ws.max_row + 1):  
+        current_collection = ws[row][0].value   
+        if last_collection !=  current_collection:
+            print(f'GettingLinks: Начат сбор ссылок для коллекции {last_collection}')   
+            Links = [] 
+            for LinkPage in LinkPages:  
+                    print("LinkPage=",LinkPage)
+                    driver.get(LinkPage)         
+                    time.sleep(5)                                                
+                    # Отбор товаров в наличие                        
+                    OnSales = driver.find_elements(By.XPATH, "//div[@class='res_cards']/div[not(@style)]") 
+                    for OnSale in OnSales:   
+                        a = OnSale.find_element(By.TAG_NAME, "a")
+                        Links.append(a.get_attribute("href"))                                           
+            LinkPages.clear()        
+            print(f'GettingLinks: Закончен сбор ссылок для коллекции {last_collection}')             
+            GoodsLinksQueue.put((last_collection, Links))
+            if  LinksNotLoaded:
+                with LinksLoaded:
+                        LinksLoaded.notify() 
+                        LinksNotLoaded = False
         LinkPages.append(ws[row][2].value) 
+        last_collection = current_collection
+    
         
     lastest_collection = ws[ws.max_row][0].value
     print(f'Начат сбор данных для следующей коллекции: {lastest_collection}')
-    for LinkPage in LinkPages:   
-           driver.get(LinkPage) 
-           print(LinkPage)
-           time.sleep(5)  
-    # Отбор товаров в наличие
-    Links = [] 
-    OnSales = driver.find_elements(By.XPATH, "//div[@class='res_cards']/div[not(@style)]") 
-    for OnSale in OnSales:   
-         a = OnSale.find_element(By.TAG_NAME, "a")
-         Links.append(a.get_attribute("href"))   
-                
-    GoodsLinksQueue.put((last_collection, Links))
-    
-    
+    for LinkPage in LinkPages: 
+        print("LinkPage=",LinkPage)
+        driver.get(LinkPage) 
+        # Отбор товаров в наличие
+        Links = [] 
+        OnSales = driver.find_elements(By.XPATH, "//div[@class='res_cards']/div[not(@style)]") 
+        for OnSale in OnSales:   
+                a = OnSale.find_element(By.TAG_NAME, "a")
+                Links.append(a.get_attribute("href"))         
+        GoodsLinksQueue.put((last_collection, Links))
+        if  LinksNotLoaded:
+            with LinksLoaded:
+                    LinksLoaded.notify() 
+                    LinksNotLoaded = False 
+    print(f'GettingLinks: Закончен сбор ссылок для коллекции {last_collection}')        
+    driver.quit() 
+        
 class TabInd:
             NAME = 0
             ARTICLE = 1
@@ -92,18 +106,21 @@ class TabInd:
             DESCRIPTION = 5
             PHOTO = 6
             LINK = 7  
+
 #Парсинг страницы товара
 def ParsingGoods(LinksLoaded, driver):
   
   Goods = []
   Video = []
   
+  print ("ParsingGoods Ожидание")
   with LinksLoaded:
         LinksLoaded.wait()
+  print ("ParsingGoods Старт")   
 
   while not GoodsLinksQueue.empty():  
      CollectionName, Links = GoodsLinksQueue.get()
-     print(f'ParsingGoods: Начат сбор данных по коллекции {CollectionName}')  
+     print(f'ParsingGoods: Начат сбор данных товаров по коллекции {CollectionName}')  
      # Сбор данных со страницы товара в структуры и запись в список 
      
      for Link in Links:
@@ -136,7 +153,7 @@ def ParsingGoods(LinksLoaded, driver):
         #Картинки
         Picture = []
         Pictures = driver.find_elements(By.XPATH,"//div[@class ='miniatures_item df fdc']//img")
-        Video.append(Pictures[0].get_attribute("src"))
+        # Video.append(Pictures[0].get_attribute("src"))
         if len(Pictures) > 5:
             for index, Pict in enumerate(Pictures):
                 if index > 0:           
@@ -158,17 +175,19 @@ def ParsingGoods(LinksLoaded, driver):
             TabInd.LINK : Link,
             }
         # Запись структуры в список   
-        Goods.append(StructureOfProduct)
+        Goods.append(StructureOfProduct)       
      # Передаем Goods 
-     print(f'ParsingGoods: Сбор данных по коллекции {CollectionName} завершен')
+     print(f'ParsingGoods: Сбор данныхс ссылки категории по коллекции {CollectionName} завершен')
      RecordingToExcel(Goods, CollectionName)
+     Goods.clear()
+     
     
         
 #Запись в эксель      
 def RecordingToExcel(Goods,CollectionName): 
     # Создание\загрузка эксель файла
-    file_name = "hasf-parser2.xlsx"
-    file_path = "G:\\NRU\\SP\\Parsing\\TestSelenium\\TestSelenium\\hasf-parser2.xlsx" 
+    file_name = "HassDate.xlsx"
+    file_path = "G:\\NRU\\SP\\Parsing\\TestSelenium\\TestSelenium\\" + file_name  
     if os.path.exists(file_name):
         wb = load_workbook(file_path)
         print(f"RecordingInExcel: Файл '{file_name}' успешно загружен.")
@@ -176,7 +195,7 @@ def RecordingToExcel(Goods,CollectionName):
         if CollectionName in wb.sheetnames:
             #Обращение к листу и удаление не актуальных данных  
             ws = wb[CollectionName] 
-            print(f"RecordingInExcel: Лист '{CollectionName}' уже существует. Данные будут обновлены.")
+            print(f"RecordingInExcel: Лист '{CollectionName}' уже существует. Данные будут обновлены.")     
             if ws.cell(row=2, column=1).value is not None:
                 for row in ws.iter_rows():
                     for cell in row: 
@@ -190,14 +209,13 @@ def RecordingToExcel(Goods,CollectionName):
        print(f"RecordingInExcel:Файл '{file_name}' успешно создан.")     
        ws = wb.create_sheet(title=CollectionName)
        print(f"RecordingInExcel:Создан новый лист '{CollectionName}'.")
-   
-    
+
     # Добавление данных
     headers = ['Название', 'Артикл', 'Бренд', 'Цена', 'Размер', 'Описание', 'Изображение', 'Изображение1', 'Изображение2', 'Изображение3', 'Ссылка на товар']  
     for col_num, header in enumerate(headers, start=1):
          ws.cell(row=1, column=col_num, value=header)
-    
-    for index, item in enumerate(Goods, start=2):  
+   
+    for index, item in enumerate(Goods, start = 2 ):  
         ws.cell(row=index, column=1, value=item[0])  
         ws.cell(row=index, column=2, value=item[1])
         ws.cell(row=index, column=3, value=item[2])
@@ -216,16 +234,11 @@ def RecordingToExcel(Goods,CollectionName):
         wb.remove(wb["Лист1"])     
         wb.save(file_path)   
     except: pass 
-    
-
-    
+      
 #Главная процедура 
 
 GoodsLinksQueue = queue.Queue()
 LinksLoaded = threading.Condition()
-
-linksParser = threading.Thread(target = GettingLinks, args = (LinksLoaded,))
-linksParser.start()
 
 ##Создание экземпляра драйвера  
 d=Service('G:\\NRU\\SP\\Parsing\\selenium\\chromedriver\\win64\\136.0.7103.92\\chromedriver.exe')
@@ -233,18 +246,17 @@ driver = webdriver.Chrome(service=d)
 #Вызов авторизации  
 AuthorizationForHasfesshen(driver) 
 
+linksParser = threading.Thread(target = GettingLinks, args = (LinksLoaded,))
+linksParser.start()
+
 GoodsParser = threading.Thread(target = ParsingGoods, args = (LinksLoaded,driver))
 GoodsParser.start()
 
-linksParser.join()
+linksParser.join() 
 GoodsParser.join()
-
-print("Готово")
+driver.quit()
+print("Готово") 
 input()
 
 
-
-
-
-    
 
