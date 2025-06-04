@@ -10,7 +10,7 @@ import time
 
 import openpyxl
 from openpyxl import Workbook,load_workbook
-import xlsxwriter
+# import xlsxwriter
 import os
 
 
@@ -31,8 +31,7 @@ def AuthorizationForHasfesshen(driver):
    
 def ScrollPage(driver):
     num_scrolls = 5
-    def scroll_down():
-            print("scroll_down:")
+    def scroll_down():        
             driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
             time.sleep(2)  
             
@@ -61,40 +60,42 @@ def GettingLinks(LinksLoaded):
             for LinkPage in LinkPages:  
                     print("LinkPage=",LinkPage)
                     driver.get(LinkPage)         
-                    time.sleep(5)                                                
+                    time.sleep(5) 
+                    ScrollPage(driver)
                     # Отбор товаров в наличие                        
                     OnSales = driver.find_elements(By.XPATH, "//div[@class='res_cards']/div[not(@style)]") 
                     for OnSale in OnSales:   
                         a = OnSale.find_element(By.TAG_NAME, "a")
                         Links.append(a.get_attribute("href"))                                           
             LinkPages.clear()        
-            print(f'GettingLinks: Закончен сбор ссылок для коллекции {last_collection}')             
+            print(f'GettingLinks: Закончен сбор ссылок для коллекции {last_collection}')  
+            time.sleep(10)  
             GoodsLinksQueue.put((last_collection, Links))
             if  LinksNotLoaded:
                 with LinksLoaded:
                         LinksLoaded.notify() 
-                        LinksNotLoaded = False
+                        LinksNotLoaded = False                  
         LinkPages.append(ws[row][2].value) 
         last_collection = current_collection
-    
         
-    lastest_collection = ws[ws.max_row][0].value
-    print(f'Начат сбор данных для следующей коллекции: {lastest_collection}')
-    for LinkPage in LinkPages: 
-        print("LinkPage=",LinkPage)
-        driver.get(LinkPage) 
-        # Отбор товаров в наличие
-        Links = [] 
-        OnSales = driver.find_elements(By.XPATH, "//div[@class='res_cards']/div[not(@style)]") 
-        for OnSale in OnSales:   
-                a = OnSale.find_element(By.TAG_NAME, "a")
-                Links.append(a.get_attribute("href"))         
-        GoodsLinksQueue.put((last_collection, Links))
-        if  LinksNotLoaded:
-            with LinksLoaded:
-                    LinksLoaded.notify() 
-                    LinksNotLoaded = False 
-    print(f'GettingLinks: Закончен сбор ссылок для коллекции {last_collection}')        
+          
+    # if lastest_collection = ws[ws.max_row][0].value
+    # print(f'Начат сбор данных для следующей коллекции: {lastest_collection}')
+    # for LinkPage in LinkPages: 
+    #     print("LinkPage=",LinkPage)
+    #     driver.get(LinkPage) 
+    #     # Отбор товаров в наличие
+    #     Links = [] 
+    #     OnSales = driver.find_elements(By.XPATH, "//div[@class='res_cards']/div[not(@style)]") 
+    #     for OnSale in OnSales:   
+    #             a = OnSale.find_element(By.TAG_NAME, "a")
+    #             Links.append(a.get_attribute("href"))         
+    #     GoodsLinksQueue.put((last_collection, Links))
+    #     if  LinksNotLoaded:
+    #         with LinksLoaded:
+    #                 LinksLoaded.notify() 
+    #                 LinksNotLoaded = False 
+    # print(f'GettingLinks: Закончен сбор ссылок для коллекции {last_collection}')        
     driver.quit() 
         
 class TabInd:
@@ -177,7 +178,7 @@ def ParsingGoods(LinksLoaded, driver):
         # Запись структуры в список   
         Goods.append(StructureOfProduct)       
      # Передаем Goods 
-     print(f'ParsingGoods: Сбор данныхс ссылки категории по коллекции {CollectionName} завершен')
+     print(f'ParsingGoods: Сбор данных товаров по коллекции {CollectionName} завершен')
      RecordingToExcel(Goods, CollectionName)
      Goods.clear()
      
@@ -257,6 +258,5 @@ GoodsParser.join()
 driver.quit()
 print("Готово") 
 input()
-
 
 
