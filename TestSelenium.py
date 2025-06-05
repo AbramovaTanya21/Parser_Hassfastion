@@ -16,35 +16,22 @@ import os
 
  # Авторизация на ХассФэсшен 
 def AuthorizationForHasfesshen(driver):
-    driver.get("https://hassfashion.ru/auth/?login=yes")
-    
+    driver.get("https://hassfashion.ru/auth/?login=yes")    
     Auht_Log = driver.find_element(By.NAME, "USER_LOGIN")
     Auht_Log.send_keys('Olga_Guschina@mail.ru')
-
     Auht_Password = driver.find_element(By.NAME, "USER_PASSWORD")
     Auht_Password.send_keys('optopt')
-
     Auth_Imp = driver.find_element(By.NAME, "Login")
-    Auth_Imp.click()
-    
+    Auth_Imp.click()  
     time.sleep(10) 
    
-def ScrollPage(driver):
-    num_scrolls = 5
-    def scroll_down():        
-            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            time.sleep(2)  
-            
-    # Делаем прокрутки
-    for i in range(num_scrolls):
-            scroll_down()
+
    
 #Получение страниц каталога из Экселя
 def GettingLinks(LinksLoaded):
     #Создание экземпляра драйвера
     s=Service('G:\\NRU\\SP\\Parsing\\selenium\\chromedriver\\win64\\136.0.7103.92\\chromedriver.exe')
     driver = webdriver.Chrome(service=s)
-    
     # Обращение к эксель файлу
     file_path = "G:\\NRU\\SP\\Parsing\\TestSelenium\\TestSelenium\\HassCatalog.xlsx"  
     wb = load_workbook(file_path)
@@ -52,52 +39,39 @@ def GettingLinks(LinksLoaded):
     LinkPages = [] 
     LinksNotLoaded = True
     last_collection = ws[2][0].value  
-    for row in range(2, ws.max_row + 1):  
-        current_collection = ws[row][0].value   
-        if last_collection !=  current_collection:
-            print(f'GettingLinks: Начат сбор ссылок для коллекции {last_collection}')   
-            Links = [] 
-            for LinkPage in LinkPages:  
-                    print("LinkPage=",LinkPage)
-                    driver.get(LinkPage)         
-                    time.sleep(5) 
-                    ScrollPage(driver)
-                    # Отбор товаров в наличие                        
-                    OnSales = driver.find_elements(By.XPATH, "//div[@class='res_cards']/div[not(@style)]") 
-                    for OnSale in OnSales:   
-                        a = OnSale.find_element(By.TAG_NAME, "a")
-                        Links.append(a.get_attribute("href"))                                           
-            LinkPages.clear()        
-            print(f'GettingLinks: Закончен сбор ссылок для коллекции {last_collection}')  
-            time.sleep(10)  
-            GoodsLinksQueue.put((last_collection, Links))
-            if  LinksNotLoaded:
-                with LinksLoaded:
-                        LinksLoaded.notify() 
-                        LinksNotLoaded = False                  
+    for row in range(2, ws.max_row+1):  
+        current_collection = ws[row][0].value 
+        if current_collection == None: break  
+        if last_collection !=  current_collection : 
+            ParsingColltction(driver, LinksNotLoaded, LinksLoaded, LinkPages, last_collection)             
         LinkPages.append(ws[row][2].value) 
         last_collection = current_collection
-        
-          
-    # if lastest_collection = ws[ws.max_row][0].value
-    # print(f'Начат сбор данных для следующей коллекции: {lastest_collection}')
-    # for LinkPage in LinkPages: 
-    #     print("LinkPage=",LinkPage)
-    #     driver.get(LinkPage) 
-    #     # Отбор товаров в наличие
-    #     Links = [] 
-    #     OnSales = driver.find_elements(By.XPATH, "//div[@class='res_cards']/div[not(@style)]") 
-    #     for OnSale in OnSales:   
-    #             a = OnSale.find_element(By.TAG_NAME, "a")
-    #             Links.append(a.get_attribute("href"))         
-    #     GoodsLinksQueue.put((last_collection, Links))
-    #     if  LinksNotLoaded:
-    #         with LinksLoaded:
-    #                 LinksLoaded.notify() 
-    #                 LinksNotLoaded = False 
-    # print(f'GettingLinks: Закончен сбор ссылок для коллекции {last_collection}')        
+               
+    # lastest_collection = ws.cell(row=ws.max_row, column=1).value
+    ParsingColltction(driver, LinksNotLoaded, LinksLoaded, LinkPages, last_collection)
+    
     driver.quit() 
-        
+
+def ParsingColltction(driver, LinksNotLoaded, LinksLoaded, LinkPages, last_collection):
+   print(f'GettingLinks: Начат сбор ссылок для коллекции {last_collection}')   
+   Links = [] 
+   for LinkPage in LinkPages:  
+        print("LinkPage=",LinkPage)
+        driver.get(LinkPage)         
+        time.sleep(5) 
+        # Отбор товаров в наличие                        
+        OnSales = driver.find_elements(By.XPATH, "//div[@class='res_cards']/div[not(@style)]") 
+        for OnSale in OnSales:   
+            a = OnSale.find_element(By.TAG_NAME, "a")
+            Links.append(a.get_attribute("href"))                                           
+   LinkPages.clear()        
+   print(f'GettingLinks: Закончен сбор ссылок для коллекции {last_collection}')  
+   GoodsLinksQueue.put((last_collection, Links))
+   if  LinksNotLoaded:
+         with LinksLoaded:
+            LinksLoaded.notify() 
+            LinksNotLoaded = False     
+     
 class TabInd:
             NAME = 0
             ARTICLE = 1
@@ -237,26 +211,19 @@ def RecordingToExcel(Goods,CollectionName):
     except: pass 
       
 #Главная процедура 
-
 GoodsLinksQueue = queue.Queue()
 LinksLoaded = threading.Condition()
-
 ##Создание экземпляра драйвера  
 d=Service('G:\\NRU\\SP\\Parsing\\selenium\\chromedriver\\win64\\136.0.7103.92\\chromedriver.exe')
 driver = webdriver.Chrome(service=d)
 #Вызов авторизации  
 AuthorizationForHasfesshen(driver) 
-
 linksParser = threading.Thread(target = GettingLinks, args = (LinksLoaded,))
 linksParser.start()
-
 GoodsParser = threading.Thread(target = ParsingGoods, args = (LinksLoaded,driver))
 GoodsParser.start()
-
 linksParser.join() 
 GoodsParser.join()
 driver.quit()
 print("Готово") 
 input()
-
-
