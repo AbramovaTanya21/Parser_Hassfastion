@@ -37,41 +37,78 @@ def GettingLinks(LinksLoaded):
     wb = load_workbook(file_path)
     ws = wb.active 
     LinkPages = [] 
-    LinksNotLoaded = True
     last_collection = ws[2][0].value  
     for row in range(2, ws.max_row+1):  
         current_collection = ws[row][0].value 
         if current_collection == None: break  
         if last_collection !=  current_collection : 
-            ParsingColltction(driver, LinksNotLoaded, LinksLoaded, LinkPages, last_collection)             
+            ParsingColltction(driver, LinksLoaded, LinkPages, last_collection)             
         LinkPages.append(ws[row][2].value) 
         last_collection = current_collection
                
     # lastest_collection = ws.cell(row=ws.max_row, column=1).value
-    ParsingColltction(driver, LinksNotLoaded, LinksLoaded, LinkPages, last_collection)
+    ParsingColltction(driver, LinksLoaded, LinkPages, last_collection)
     
     driver.quit() 
 
-def ParsingColltction(driver, LinksNotLoaded, LinksLoaded, LinkPages, last_collection):
+def ParsingColltction(driver, LinksLoaded, LinkPages, last_collection):
    print(f'GettingLinks: Начат сбор ссылок для коллекции {last_collection}')   
    Links = [] 
-   for LinkPage in LinkPages:  
-        print("LinkPage=",LinkPage)
-        driver.get(LinkPage)         
-        time.sleep(5) 
-        # Отбор товаров в наличие                        
-        OnSales = driver.find_elements(By.XPATH, "//div[@class='res_cards']/div[not(@style)]") 
-        for OnSale in OnSales:   
-            a = OnSale.find_element(By.TAG_NAME, "a")
-            Links.append(a.get_attribute("href"))                                           
+   FilteredPaginatorConteyner = []
+   for LinkPage in LinkPages: 
+        driver.get(LinkPage)  
+        FilteredPaginatorConteyner.append(LinkPage)
+        try:
+             Paginatorbutton = driver.find_element(By.XPATH, "//a[contains(@class, 'next')]")
+             print("Пагинация есть:", Paginatorbutton)
+             while PaginatorPage != None:
+                    PaginatorPage = driver.find_element(By.XPATH, "//div[contains(@data-pagination,'PAGEN')]").get_attribute("data-href")
+                    FilteredPaginatorConteyner.append("https://hassfashion.ru/catalog" + PaginatorPage)  
+                    PaginatorPage.click()                  
+                    time.sleep(3)                  
+        except: 
+            print(f"На странице {LinkPage}  отсутствует пагинация")
+                    
+   for FilteredPaginatorPage in FilteredPaginatorConteyner: 
+            driver.get(FilteredPaginatorPage) 
+            print("LinkPage=",LinkPage)
+            driver.get(FilteredPaginatorPage)         
+            time.sleep(5) 
+            # Отбор товаров в наличие                        
+            OnSales = driver.find_elements(By.XPATH, "//div[@class='res_cards']/div[not(@style)]") 
+            for OnSale in OnSales:   
+                    a = OnSale.find_element(By.TAG_NAME, "a")
+                    Links.append(a.get_attribute("href"))     
    LinkPages.clear()        
    print(f'GettingLinks: Закончен сбор ссылок для коллекции {last_collection}')  
+   
    GoodsLinksQueue.put((last_collection, Links))
-   if  LinksNotLoaded:
-         with LinksLoaded:
+   with LinksLoaded:
             LinksLoaded.notify() 
             LinksNotLoaded = False     
-     
+    
+# def Pagination(driver, LinkPage):
+#     driver.get(LinkPage)
+#     print("LinkPage=",LinkPage)
+#     time.sleep(5) 
+#     PaginatorConteyner = []   
+#     # PaginateLinks = []
+#     try:
+#        PaginatorPage = driver.find_element(By.XPATH, "//div[contains(@data-pagination,'PAGEN')]").get_attribute("data-href")    
+#        PaginatorContainer = "https://hassfashion.ru/catalog" + PaginatorPage
+       
+#        PaginatorList = []
+#        for PaginatorPage in PaginatorContainer:  
+#               driver.get(PaginatorPage) 
+#               # time.sleep(5)
+#               # OnSales = driver.find_elements(By.XPATH, "//div[@class='res_cards']/div[not(@style)]") 
+#               # for OnSale in OnSales:   
+#               #       a = OnSale.find_element(By.TAG_NAME, "a")
+#               #       PaginateLinks.append(a.get_attribute("href")) 
+#        return  PaginateLinks      
+#     except Exception as e:
+#         print(f"На странице отсутствует пагинация")
+
 class TabInd:
             NAME = 0
             ARTICLE = 1
