@@ -61,17 +61,17 @@ def ParsingColltction(driver, LinksLoaded, LinkPages, last_collection):
         try:
              PaginatorPage = driver.find_element(By.XPATH, "//div[contains(@data-pagination,'PAGEN')]")
              print("Пагинация есть:", PaginatorPage)
-             while PaginatorPage != None:
+             while PaginatorPage != "":
                     PaginatorPage = driver.find_element(By.XPATH, "//div[contains(@data-pagination,'PAGEN')]").get_attribute("data-href")
-                    FilteredPaginatorConteyner.append("https://hassfashion.ru/catalog" + PaginatorPage)  
-                    PaginatorPage.click()                  
+                    PaginatorLoadPage = "https://hassfashion.ru" + PaginatorPage
+                    FilteredPaginatorConteyner.append(PaginatorLoadPage)  
+                    driver.get(PaginatorLoadPage)                    
                     time.sleep(3)                  
-        except: 
-            print(f"На странице {LinkPage}  отсутствует пагинация")
+        except: print(f"На странице {LinkPage}  отсутствует пагинация")
                     
    for FilteredPaginatorPage in FilteredPaginatorConteyner: 
             driver.get(FilteredPaginatorPage) 
-            print("LinkPage=",LinkPage)
+            print("LinkPage=",FilteredPaginatorPage)
             driver.get(FilteredPaginatorPage)         
             time.sleep(5) 
             # Отбор товаров в наличие                        
