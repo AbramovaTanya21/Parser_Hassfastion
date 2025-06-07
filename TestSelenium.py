@@ -10,11 +10,18 @@ import time
 
 import openpyxl
 from openpyxl import Workbook,load_workbook
-# import xlsxwriter
 import os
 
+# казание пути компонентам парсера
+# Определение пути к chromedriver 
+ChromedriverPuth = 'G:\\NRU\\SP\\Parsing\\selenium\\chromedriver\\win64\\136.0.7103.92\\chromedriver.exe'
+# Определение пути к файлу с коллекциями HassCatalog   
+CoollectionFilePath = "G:\\NRU\\SP\\Parsing\\TestSelenium\\TestSelenium\\HassCatalog.xlsx" 
+# Определение имени и автоформирование относительного пути к файлу загрузки данных HassDate
+file_name = "HassDate.xlsx"
+file_path = "./" + file_name  
 
- # Авторизация на ХассФэсшен 
+# Авторизация на ХассФэсшен 
 def AuthorizationForHasfesshen(driver):
     driver.get("https://hassfashion.ru/auth/?login=yes")    
     Auht_Log = driver.find_element(By.NAME, "USER_LOGIN")
@@ -24,17 +31,15 @@ def AuthorizationForHasfesshen(driver):
     Auth_Imp = driver.find_element(By.NAME, "Login")
     Auth_Imp.click()  
     time.sleep(10) 
-   
-
-   
+    
 #Получение страниц каталога из Экселя
 def GettingLinks(LinksLoaded):
     #Создание экземпляра драйвера
-    s=Service('G:\\NRU\\SP\\Parsing\\selenium\\chromedriver\\win64\\136.0.7103.92\\chromedriver.exe')
+    s=Service(ChromedriverPuth) 
     driver = webdriver.Chrome(service=s)
     # Обращение к эксель файлу
     file_path = "G:\\NRU\\SP\\Parsing\\TestSelenium\\TestSelenium\\HassCatalog.xlsx"  
-    wb = load_workbook(file_path)
+    wb = load_workbook(CoollectionFilePath)
     ws = wb.active 
     LinkPages = [] 
     last_collection = ws[2][0].value  
@@ -57,58 +62,26 @@ def ParsingColltction(driver, LinksLoaded, LinkPages, last_collection):
    FilteredPaginatorConteyner = []
    for LinkPage in LinkPages: 
         driver.get(LinkPage)  
-        FilteredPaginatorConteyner.append(LinkPage)
-        try:
-             PaginatorPage = driver.find_element(By.XPATH, "//div[contains(@data-pagination,'PAGEN')]")
-             print("Пагинация есть:", PaginatorPage)
-             while PaginatorPage != "":
-                    PaginatorPage = driver.find_element(By.XPATH, "//div[contains(@data-pagination,'PAGEN')]").get_attribute("data-href")
-                    PaginatorLoadPage = "https://hassfashion.ru" + PaginatorPage
-                    FilteredPaginatorConteyner.append(PaginatorLoadPage)  
-                    driver.get(PaginatorLoadPage)                    
-                    time.sleep(3)                  
-        except: print(f"На странице {LinkPage}  отсутствует пагинация")
-                    
-   for FilteredPaginatorPage in FilteredPaginatorConteyner: 
-            driver.get(FilteredPaginatorPage) 
-            print("LinkPage=",FilteredPaginatorPage)
-            driver.get(FilteredPaginatorPage)         
-            time.sleep(5) 
+        PaginatorPage = LinkPage 
+        while True:
+            print(f"LinkPage: {PaginatorPage}")
             # Отбор товаров в наличие                        
             OnSales = driver.find_elements(By.XPATH, "//div[@class='res_cards']/div[not(@style)]") 
             for OnSale in OnSales:   
-                    a = OnSale.find_element(By.TAG_NAME, "a")
-                    Links.append(a.get_attribute("href"))     
+                a = OnSale.find_element(By.TAG_NAME, "a")
+                Links.append(a.get_attribute("href"))     
+            try:
+                PaginatorPage = driver.find_element(By.XPATH, "//div[contains(@data-pagination,'PAGEN')]")   
+                PaginatorLoadPage = "https://hassfashion.ru" + driver.find_element(By.XPATH, "//div[contains(@data-pagination,'PAGEN')]").get_attribute("data-href") 
+                driver.get(PaginatorLoadPage)           
+            except: break        
    LinkPages.clear()        
    print(f'GettingLinks: Закончен сбор ссылок для коллекции {last_collection}')  
-   
    GoodsLinksQueue.put((last_collection, Links))
    with LinksLoaded:
             LinksLoaded.notify() 
             LinksNotLoaded = False     
-    
-# def Pagination(driver, LinkPage):
-#     driver.get(LinkPage)
-#     print("LinkPage=",LinkPage)
-#     time.sleep(5) 
-#     PaginatorConteyner = []   
-#     # PaginateLinks = []
-#     try:
-#        PaginatorPage = driver.find_element(By.XPATH, "//div[contains(@data-pagination,'PAGEN')]").get_attribute("data-href")    
-#        PaginatorContainer = "https://hassfashion.ru/catalog" + PaginatorPage
-       
-#        PaginatorList = []
-#        for PaginatorPage in PaginatorContainer:  
-#               driver.get(PaginatorPage) 
-#               # time.sleep(5)
-#               # OnSales = driver.find_elements(By.XPATH, "//div[@class='res_cards']/div[not(@style)]") 
-#               # for OnSale in OnSales:   
-#               #       a = OnSale.find_element(By.TAG_NAME, "a")
-#               #       PaginateLinks.append(a.get_attribute("href")) 
-#        return  PaginateLinks      
-#     except Exception as e:
-#         print(f"На странице отсутствует пагинация")
-
+   
 class TabInd:
             NAME = 0
             ARTICLE = 1
@@ -198,8 +171,8 @@ def ParsingGoods(LinksLoaded, driver):
 #Запись в эксель      
 def RecordingToExcel(Goods,CollectionName): 
     # Создание\загрузка эксель файла
-    file_name = "HassDate.xlsx"
-    file_path = "G:\\NRU\\SP\\Parsing\\TestSelenium\\TestSelenium\\" + file_name  
+    # file_name = "HassDate.xlsx"
+    # file_path = "G:\\NRU\\SP\\Parsing\\TestSelenium\\TestSelenium\\" + file_name  
     if os.path.exists(file_name):
         wb = load_workbook(file_path)
         print(f"RecordingInExcel: Файл '{file_name}' успешно загружен.")
@@ -248,10 +221,11 @@ def RecordingToExcel(Goods,CollectionName):
     except: pass 
       
 #Главная процедура 
+     
 GoodsLinksQueue = queue.Queue()
 LinksLoaded = threading.Condition()
 ##Создание экземпляра драйвера  
-d=Service('G:\\NRU\\SP\\Parsing\\selenium\\chromedriver\\win64\\136.0.7103.92\\chromedriver.exe')
+d=Service(ChromedriverPuth)  
 driver = webdriver.Chrome(service=d)
 #Вызов авторизации  
 AuthorizationForHasfesshen(driver) 
