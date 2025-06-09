@@ -58,7 +58,6 @@ def ParsingCollection(driver, LinksLoaded, LinkPages, last_collection):
         driver.get(LinkPage)  
         PaginatorPage = LinkPage 
         while True:
-            print(f"LinkPage: {PaginatorPage}")
             # Отбор товаров в наличие                        
             OnSales = driver.find_elements(By.XPATH, "//div[@class='res_cards']/div[not(@style)]") 
             for OnSale in OnSales:   
