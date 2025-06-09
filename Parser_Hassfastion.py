@@ -58,6 +58,7 @@ def ParsingCollection(driver, LinksLoaded, LinkPages, last_collection):
         driver.get(LinkPage)  
         PaginatorPage = LinkPage 
         while True:
+            print(f"LinkPage: {PaginatorPage}")
             # Отбор товаров в наличие                        
             OnSales = driver.find_elements(By.XPATH, "//div[@class='res_cards']/div[not(@style)]") 
             for OnSale in OnSales:   
@@ -193,7 +194,7 @@ def RecordingToExcel(Goods,CollectionName):
         for imgindex, img in enumerate(reversed(item[TabInd.PHOTO])):   
              if imgindex < 4:
                 ws.cell(row=index, column=7 + imgindex, value = img) 
-        ws.cell(row=index, column=11, value=item[TabInd.NAME])
+        ws.cell(row=index, column=11, value=item[TabInd.LINK ])
     wb.save(file_path)
     print(f"RecordingInExcel: Данные по категории {CollectionName} успешно записаны в файл '{file_name}'.")   
     try:  
