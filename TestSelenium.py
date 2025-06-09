@@ -12,22 +12,22 @@ import openpyxl
 from openpyxl import Workbook,load_workbook
 import os
 
-# Указание пути к компонентам парсера
+# Указание пути компонентам парсера
 # Определение пути к chromedriver 
 ChromedriverPuth = 'G:\\NRU\\SP\\Parsing\\selenium\\chromedriver\\win64\\136.0.7103.92\\chromedriver.exe'
 # Определение пути к файлу с коллекциями HassCatalog   
-CoollectionFilePath = "G:\\NRU\\SP\\Parsing\\TestSelenium\\TestSelenium\\HassCatalog.xlsx" 
+CollectionFilePath = ".\HassCatalog.xlsx" 
 # Определение имени и автоформирование относительного пути к файлу загрузки данных HassDate
 file_name = "HassDate.xlsx"
 file_path = "./" + file_name  
 
 # Авторизация на ХассФэсшен 
-def AuthorizationForHasfesshen(driver):
+def Authorization(driver):
     driver.get("https://hassfashion.ru/auth/?login=yes")    
-    Auht_Log = driver.find_element(By.NAME, "USER_LOGIN")
-    Auht_Log.send_keys('Olga_Guschina@mail.ru')
-    Auht_Password = driver.find_element(By.NAME, "USER_PASSWORD")
-    Auht_Password.send_keys('optopt')
+    Auth_Log = driver.find_element(By.NAME, "USER_LOGIN")
+    Auth_Log.send_keys('Olga_Guschina@mail.ru')
+    Auth_Password = driver.find_element(By.NAME, "USER_PASSWORD")
+    Auth_Password.send_keys('optopt')
     Auth_Imp = driver.find_element(By.NAME, "Login")
     Auth_Imp.click()  
     time.sleep(10) 
@@ -37,9 +37,8 @@ def GettingLinks(LinksLoaded):
     #Создание экземпляра драйвера
     s=Service(ChromedriverPuth) 
     driver = webdriver.Chrome(service=s)
-    # Обращение к эксель файлу
-    file_path = "G:\\NRU\\SP\\Parsing\\TestSelenium\\TestSelenium\\HassCatalog.xlsx"  
-    wb = load_workbook(CoollectionFilePath)
+    # Обращение к эксель файлу 
+    wb = load_workbook(CollectionFilePath)
     ws = wb.active 
     LinkPages = [] 
     last_collection = ws[2][0].value  
@@ -47,13 +46,13 @@ def GettingLinks(LinksLoaded):
         current_collection = ws[row][0].value 
         if current_collection == None: break  
         if last_collection !=  current_collection : 
-            ParsingColltction(driver, LinksLoaded, LinkPages, last_collection)             
+             ParsingCollection(driver, LinksLoaded, LinkPages, last_collection)             
         LinkPages.append(ws[row][2].value) 
         last_collection = current_collection
-    ParsingColltction(driver, LinksLoaded, LinkPages, last_collection)
+    ParsingCollection(driver, LinksLoaded, LinkPages, last_collection)
     driver.quit() 
 
-def ParsingColltction(driver, LinksLoaded, LinkPages, last_collection):
+def ParsingCollection(driver, LinksLoaded, LinkPages, last_collection):
    print(f'GettingLinks: Начат сбор ссылок для коллекции {last_collection}')   
    Links = [] 
    FilteredPaginatorConteyner = []
@@ -77,7 +76,8 @@ def ParsingColltction(driver, LinksLoaded, LinkPages, last_collection):
    GoodsLinksQueue.put((last_collection, Links))
    with LinksLoaded:
             LinksLoaded.notify() 
-            LinksNotLoaded = False       
+            LinksNotLoaded = False     
+   
 class TabInd:
             NAME = 0
             ARTICLE = 1
@@ -87,9 +87,9 @@ class TabInd:
             DESCRIPTION = 5
             PHOTO = 6
             LINK = 7  
-  
+
 #Парсинг страницы товара
-def ParsingGoods(LinksLoaded, driver):  
+def ParsingGoods(LinksLoaded, driver):
   Goods = []
   Video = []
   print ("ParsingGoods Ожидание")
@@ -99,7 +99,7 @@ def ParsingGoods(LinksLoaded, driver):
   while not GoodsLinksQueue.empty():  
      CollectionName, Links = GoodsLinksQueue.get()
      print(f'ParsingGoods: Начат сбор данных товаров по коллекции {CollectionName}')  
-     # Сбор данных со страницы товара в структуры и запись в список   
+     # Сбор данных со страницы товара в структуры и запись в список 
      for Link in Links:
         driver.get(Link)         
         #Имя
@@ -185,7 +185,7 @@ def RecordingToExcel(Goods,CollectionName):
     # Добавление данных
     headers = ['Название', 'Артикл', 'Бренд', 'Цена', 'Размер', 'Описание', 'Изображение', 'Изображение1', 'Изображение2', 'Изображение3', 'Ссылка на товар']  
     for col_num, header in enumerate(headers, start=1):
-         ws.cell(row=1, column=col_num, value=header)
+         ws.cell(row=1, column=col_num, value=header)  
     for index, item in enumerate(Goods, start = 2 ):  
         ws.cell(row=index, column=1, value=item[0])  
         ws.cell(row=index, column=2, value=item[1])
@@ -198,21 +198,21 @@ def RecordingToExcel(Goods,CollectionName):
                 ws.cell(row=index, column=7 + imgindex, value = img) 
         ws.cell(row=index, column=11, value=item[7])
     wb.save(file_path)
-    print(f"RecordingInExcel: Данные по категории {CollectionName} успешно записаны в файл '{file_name}'.") 
+    print(f"RecordingInExcel: Данные по категории {CollectionName} успешно записаны в файл '{file_name}'.")   
     try:  
         wb["Sheet"].title = "Лист1"
         wb.remove(wb["Лист1"])     
         wb.save(file_path)   
     except: pass 
       
-#Главная процедура      
+#Главная процедура     
 GoodsLinksQueue = queue.Queue()
 LinksLoaded = threading.Condition()
 ##Создание экземпляра драйвера  
 d=Service(ChromedriverPuth)  
 driver = webdriver.Chrome(service=d)
 #Вызов авторизации  
-AuthorizationForHasfesshen(driver) 
+Authorization(driver) 
 linksParser = threading.Thread(target = GettingLinks, args = (LinksLoaded,))
 linksParser.start()
 GoodsParser = threading.Thread(target = ParsingGoods, args = (LinksLoaded,driver))
