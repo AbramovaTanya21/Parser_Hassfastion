@@ -24,9 +24,9 @@ file_name = "HassDate.xlsx"
 file_path = "./" + file_name  
 
 # Авторизация на ХассФэсшен 
-def Authorization(driver):      
-    # a=Service(ChromedriverPuth) # Создание экземпляра драйвера
-    # driver = webdriver.Chrome(service=a)
+def Authorization():      
+    a=Service(ChromedriverPuth) # Создание экземпляра драйвера
+    driver = webdriver.Chrome(service=a)
     driver.get("https://hassfashion.ru/auth/?login=yes")    
     Auth_Log = driver.find_element(By.NAME, "USER_LOGIN")
     Auth_Log.send_keys('Olga_Guschina@mail.ru')
@@ -35,8 +35,7 @@ def Authorization(driver):
     Auth_Imp = driver.find_element(By.NAME, "Login")
     Auth_Imp.click() 
     time.sleep(5) 
-    # with open('cookies.json', 'w') as f: # Создание куки
-    #     json.dump(s.cookies.get_dict(), f)
+    return driver
 
 #Получение страниц каталога из Экселя
 def GettingLinks(LinksLoaded):   
@@ -57,7 +56,6 @@ def GettingLinks(LinksLoaded):
         LinkPages.append(ws[row][2].value) 
         last_collection = current_collection
     ParsingCollection(driver, LinksLoaded, LinkPages, last_collection, NotCount) 
-    driver.quit()
 
 def ParsingCollection(driver, LinksLoaded, LinkPages, last_collection, NotCount):
    print(f'GettingLinks: Начат сбор ссылок для коллекции {last_collection}')  
@@ -81,7 +79,6 @@ def ParsingCollection(driver, LinksLoaded, LinkPages, last_collection, NotCount)
             except: break        
    LinkPages.clear()        
    print(f'GettingLinks: Закончен сбор ссылок для коллекции {last_collection}')
-   # GoodsLinksQueue.put((last_collection, Links))
    GoodsLinksQueue.put((last_collection, Links))
    if NotCount < WORKERS_COUNT:
        NotCount += 1
@@ -91,7 +88,6 @@ def ParsingCollection(driver, LinksLoaded, LinkPages, last_collection, NotCount)
         print("ParsingGoods", threading.current_thread().name, "стоп")
         NotCount = 0
      
-
 class TabInd:
             NAME = 0
             ARTICLE = 1
@@ -103,9 +99,10 @@ class TabInd:
             LINK = 7  
 
 #Парсинг страницы товара
-def ParsingGoods(driver, LinksLoaded, Locker):
+def ParsingGoods(LinksLoaded, Locker):
      Goods = []
      Video = []
+     driver = Authorization()
      print(f"ParsingGoods ({threading.current_thread().name}): Ожидание")
      with LinksLoaded:
             LinksLoaded.wait()   
@@ -113,14 +110,7 @@ def ParsingGoods(driver, LinksLoaded, Locker):
      while not GoodsLinksQueue.empty():  
              CollectionName, Links = GoodsLinksQueue.get(timeout=1)
              print(f'ParsingGoods({threading.current_thread().name}): Начат сбор данных товаров по коллекции {CollectionName}')  
-             # Сбор данных со страницы товара в структуры и запись в список  
-             # # Создание экземпляра драйвера             
-             # d=Service(ChromedriverPuth) 
-             # driver = webdriver.Chrome(service=d)
-             # Загружаем cookie
-             # with open('cookies.json', 'r') as f:
-             #      cookies = json.load(f)
-             #      s.cookies.update(cookies)        
+             # Сбор данных со страницы товара в структуры и запись в список    
              for Link in Links:        
                 driver.get(Link)  
                 #Имя
@@ -202,10 +192,11 @@ def ParsingGoods(driver, LinksLoaded, Locker):
              # Передаем Goods 
              print(f'ParsingGoods ({threading.current_thread().name}): Сбор данных товаров по коллекции {CollectionName} завершен')
              driver.quit()
-             with Locker:
-                RecordingToExcel(Goods, CollectionName)
+             # with Locker:
+             RecordingToExcel(Goods, CollectionName)
              # print(f'ParsingGoods({GoodsParser.name}): Данные товаров по коллекции {CollectionName} записаны')
              Goods.clear()
+
              
 #Запись в эксель      
 def RecordingToExcel(Goods,CollectionName): 
@@ -259,26 +250,17 @@ if __name__ == '__main__': #Главная процедура
     GoodsLinksQueue = queue.Queue()
     LinksLoaded = threading.Condition()
     Locker = threading.Lock() 
-    # s = requests.Session() # Создание сессии 
-    # Authorization() # Вызов авторизации 
     # Вызов производящего потока
     linksParser = threading.Thread(target = GettingLinks, args = (LinksLoaded,))
     linksParser.start() 
     # Вызов группы потребляющих потоков
-    for i in range(WORKERS_COUNT):
-        d=Service(ChromedriverPuth) 
-        driver = webdriver.Chrome(service=d)
-        GoodsParser = threading.Thread(name = str(i), target = ParsingGoods, args = (driver, LinksLoaded, Locker))
-        Authorization(driver) # Вызов авторизации  
+    for i in range(WORKERS_COUNT):  
+        GoodsParser = threading.Thread(name = str(i), target = ParsingGoods, args = (LinksLoaded, Locker)) 
         GoodsParser.start()  
     for thread in threading.enumerate():
             if thread != threading.main_thread(): 
                 thread.join()                          
     linksParser.join()
-    driver.quit()
     print("Готово") 
     input()
     
-    # GoodsParser = threading.Thread(target = ParsingGoods, args = (LinksLoaded,driver))
-    # GoodsParser.start()
-    # GoodsParser.join()
