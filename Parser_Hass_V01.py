@@ -127,9 +127,7 @@ def ParsingGoods(LinksLoaded, driver):
             discount_percent = ((not_discount_price-Price)/not_discount_price)*100
             if discount_percent > 30: 
                 price_percent = ((30+((int(discount_percent)-30)/2))/100) 
-                Price = ceil(float(not_discount_price) - (float(not_discount_price)*price_percent))
-            else: Price = Price
-                
+                Price = ceil(float(not_discount_price) * (1-price_percent))              
        #Размер
         SizeList = []
         Sizes = driver.find_elements(By.XPATH,"//div[contains(@class,'offer-size size rel df aic jcc txt_bolder')][not(contains(@class,'disable'))]")
