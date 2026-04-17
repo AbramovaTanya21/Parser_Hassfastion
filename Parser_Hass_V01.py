@@ -1,7 +1,9 @@
 ﻿from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
+import requests
 import threading
 import queue
 import time
@@ -13,9 +15,11 @@ import openpyxl
 from openpyxl import Workbook,load_workbook
 import os
 
+chrome_options = Options()
+chrome_options.binary_location = "G:\\Applications\\Crome\\chrome-win32\\chrome.exe"
 # Указание пути компонентам парсера
 # Определение пути к chromedriver 
-ChromedriverPuth = 'G:\\Applications\\Selenium\\Chrome_draver\\chromedriver-win64\\142\\chromedriver.exe'
+ChromedriverPuth = 'G:\\Applications\\Selenium\\Chrome_draver\\chromedriver-win64\\145\\chromedriver.exe'
 # Определение пути к файлу с коллекциями HassCatalog   
 CollectionFilePath = "G:\\Program Proects\\Parsers\\Parser_Hass_V01\\Parser_Hass_V01\\HassCatalog.xlsx" 
 # Определение имени и автоформирование относительного пути к файлу загрузки данных HassDate
@@ -37,7 +41,7 @@ def Authorization(driver):
 def GettingLinks(LinksLoaded):
     #Создание экземпляра драйвера
     s=Service(ChromedriverPuth) 
-    driver = webdriver.Chrome(service=s)
+    driver = webdriver.Chrome(service=s, options=chrome_options)
     # Обращение к эксель файлу 
     wb = load_workbook(CollectionFilePath)
     ws = wb.active 
@@ -116,8 +120,15 @@ def ParsingGoods(LinksLoaded, driver):
             Color = ""
         Name = f"{Name1} {Color}"
         #Цена
-        Price = driver.find_element(By.XPATH,"//span[@class='price']").get_attribute("innerText").strip("₽").replace("\xa0","")
-        #Размер
+        Price = int(driver.find_element(By.XPATH,"//span[@class='price']").get_attribute("innerText").strip("₽").replace("\xa0",""))
+        if CollectionName == "Распродажа":
+            not_discount_price =  int(driver.find_element(By.XPATH,"//del[@class='discount txt typing']/span").get_attribute("innerText").strip("₽").replace("\xa0",""))
+            discount_percent = ((not_discount_price-Price)/not_discount_price)*100
+            if discount_percent > 30: 
+                price_percent = ((30+((int(discount_percent)-30)/2))/100) 
+                Price = float(not_discount_price) - (float(not_discount_price)*price_percent)
+            else: Price = Price
+       #Размер
         SizeList = []
         Sizes = driver.find_elements(By.XPATH,"//div[contains(@class,'offer-size size rel df aic jcc txt_bolder')][not(contains(@class,'disable'))]")
         if Sizes == []: continue
@@ -155,16 +166,20 @@ def ParsingGoods(LinksLoaded, driver):
         if len(Pictures)==0:
             Pictures = driver.find_elements(By.XPATH,"//img[@alt=' "+Name1+"']")
         if len(Pictures)==0:
-            print(Link)
+            Pictures = driver.find_elements(By.XPATH,"//img[@alt=' "+Name1+"']")
+            # print(Link)
             continue
         # Video.append(Pictures[0].get_attribute("src"))
-        for i in range(min(4, len(Pictures))):
+        for i in range(min(4, len(Pictures))):    
+            time.sleep(1)
             response = requests.get(Pictures[i].get_attribute("src"))
             response.raise_for_status()  # Проверяем успешность запроса hassfashion.neocities.org/hass/
             image = Image.open(BytesIO(response.content))
             image = image.convert('RGB')
+            if '"' in Name1: 
+               Name1 = Name1.replace('"','')
             fname = Name1 + "img"+ str(i) +".jpg"
-            image.save("G:\\SP\\Hassfashion\\FotoHass\\" + fname, 'JPEG', quality=95)
+            image.save('G:\\SP\\Hassfashion\\HassFoto\\hass\\' + fname, 'JPEG', quality=95)
             Picture.append("https://hassfashion.neocities.org/hass/" + fname.replace(" ", "%20"))  
         # Запись данных в экземляр структуры StructureOfProducts    
         StructureOfProduct = {
@@ -178,11 +193,13 @@ def ParsingGoods(LinksLoaded, driver):
             TabInd.LINK : Link,
             }
         # Запись структуры в список   
-        Goods.append(StructureOfProduct)       
+        Goods.append(StructureOfProduct)        
      # Передаем Goods 
      print(f'ParsingGoods: Сбор данных товаров по коллекции {CollectionName} завершен')
      RecordingToExcel(Goods, CollectionName)
+     print(Goods)
      Goods.clear()
+
        
 #Запись в эксель      
 def RecordingToExcel(Goods,CollectionName): 
@@ -233,9 +250,12 @@ def RecordingToExcel(Goods,CollectionName):
 #Главная процедура     
 GoodsLinksQueue = queue.Queue()
 LinksLoaded = threading.Condition()
-##Создание экземпляра драйвера  
-d=Service(ChromedriverPuth)  
-driver = webdriver.Chrome(service=d)
+##Создание экземпляра драйвера 
+chrome_options = Options()
+chrome_options.binary_location = "G:\\Applications\\Crome\\chrome-win32\\chrome.exe"
+d = Service(executable_path=ChromedriverPuth) 
+driver = webdriver.Chrome(service=d, options=chrome_options)
+
 #Вызов авторизации  
 Authorization(driver) 
 linksParser = threading.Thread(target = GettingLinks, args = (LinksLoaded,))
