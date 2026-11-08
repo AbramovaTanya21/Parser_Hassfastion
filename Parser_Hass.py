@@ -12,7 +12,7 @@ import requests
 from PIL import Image
 from io import BytesIO
 from math import ceil
-import re
+
 
 import openpyxl
 from openpyxl import Workbook,load_workbook
@@ -30,7 +30,6 @@ CollectionFilePath = "G:\\Program Proects\\Parsers\\Parser_Hass_V1\\Parser_Hass\
 file_name = "HassDate.xlsx"
 file_path = "./" + file_name  
 
-UnneedNews = re.compile(r"^2627-\d{4}-\d{2}$")
 
 
 # Авторизация на ХассФэсшен 
@@ -136,9 +135,8 @@ def ParsingGoods(LinksLoaded, driver):
         try:
             Article = driver.find_element(By.XPATH,"//div[@class ='vendor df jcsb']/span[2]").get_attribute("innerText")
         except: continue     
-        # if re.search(UnneedNews,Article) != None:
-        if UnneedNews.search(Article):
-             continue  
+        if Article.startswith("2627") == True: 
+            continue  
         #Имя
         Name1 = driver.find_element(By.TAG_NAME,"h1").get_attribute("innerText")
          
